@@ -70,9 +70,9 @@ class DelayModel:
         return np.where(data['min_diff'] > threshold_in_minutes, 1, 0)
 
     @staticmethod
-    def get_train_features(data: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def get_train_features(data: pd.DataFrame, target_column: str = None) -> Tuple[pd.DataFrame, pd.DataFrame]:
         # Never used, but in notebook.
-        training_data = shuffle(data[['OPERA', 'MES', 'TIPOVUELO', 'SIGLADES', 'DIANOM', 'delay']], random_state=111)
+        # training_data = shuffle(data[['OPERA', 'MES', 'TIPOVUELO', 'SIGLADES', 'DIANOM', 'delay']], random_state=111)
 
         features = pd.concat([
             pd.get_dummies(data['OPERA'], prefix='OPERA'),
@@ -81,7 +81,7 @@ class DelayModel:
             axis=1
         )
 
-        target = data['delay']
+        target = data.get(target_column, 'delay')
 
         return features, target
 
@@ -112,7 +112,7 @@ class DelayModel:
         data['min_diff'] = data.apply(self.get_min_diff, axis=1)
 
         # Setting delay label if delay > 15 minutes
-        data['delay'] = self.is_delay(data)
+        data[target_column if target_column else 'delay'] = self.is_delay(data)
 
         # Getting features and target
         features, target = self.get_train_features(data)
