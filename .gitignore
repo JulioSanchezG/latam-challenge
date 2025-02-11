@@ -53,6 +53,7 @@ Thumbs.db
 reports
 coverage
 *.lcov
+.pytest_cache/
 
 ###########################
 ### dotenv
