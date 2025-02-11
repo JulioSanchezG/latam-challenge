@@ -1,20 +1,41 @@
+import json
+import os
+
+import joblib
+
 import numpy as np
 import pandas as pd
 
 from typing import Tuple, Union, List
 from datetime import datetime
+from pathlib import Path
 
 from numpy import ndarray
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split
-from sklearn.utils import shuffle
-from sklearn.metrics import confusion_matrix, classification_report
-from xgboost import XGBClassifier
+
+CURRENT_DIR = Path(__file__).parent.resolve()
 
 
 class DelayModel:
 
     def __init__(self):
-        self._model = None  # Model should be saved in this attribute.
+        self._model: LogisticRegression | None = None  # Model should be saved in this attribute.
+        self._model_version: str = '1.0'
+        self._model_path: Path = CURRENT_DIR.parent / "models" / f"v{self._model_version}"
+        self.top_10_features = [
+            "OPERA_Latin American Wings",
+            "MES_7",
+            "MES_10",
+            "OPERA_Grupo LATAM",
+            "MES_12",
+            "TIPOVUELO_I",
+            "MES_4",
+            "MES_11",
+            "OPERA_Sky Airline",
+            "OPERA_Copa Air"
+        ]
 
     @staticmethod
     def get_period_day(date: str) -> str:
@@ -69,8 +90,8 @@ class DelayModel:
     def is_delay(data: pd.DataFrame, threshold_in_minutes: int = 15) -> ndarray:
         return np.where(data['min_diff'] > threshold_in_minutes, 1, 0)
 
-    @staticmethod
-    def get_train_features(data: pd.DataFrame, target_column: str = None) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def get_train_features(self, data: pd.DataFrame, target_column: str = None) -> Union[
+        Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]:
         # Never used, but in notebook.
         # training_data = shuffle(data[['OPERA', 'MES', 'TIPOVUELO', 'SIGLADES', 'DIANOM', 'delay']], random_state=111)
 
@@ -81,14 +102,41 @@ class DelayModel:
             axis=1
         )
 
-        target = data.get(target_column, 'delay')
+        # Getting just the top 10 features
+        features = features.reindex(columns=self.top_10_features, fill_value=0)
 
-        return features, target
+        if target_column:
+            target = data[[target_column]]
+            return features, target
+
+        return features
+
+    def store_model(self, x_test, y_test):
+        self._model_path.mkdir(parents=True, exist_ok=True)
+
+        joblib.dump(self._model, self._model_path / "lr_model.pkl")
+
+        y_pred = self._model.predict(x_test)
+        report = classification_report(y_test, y_pred, output_dict=True)
+
+        metadata = {
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "version": self._model_version,
+            "features": self.top_10_features,
+            "accuracy": {
+                "class_0": report['0'],
+                "class_1": report['1'],
+                "accuracy": report['accuracy'],
+            },
+        }
+
+        with open(self._model_path / "lr_metadata.json", "w") as f:
+            json.dump(metadata, f, indent=4)
 
     def preprocess(
-        self,
-        data: pd.DataFrame,
-        target_column: str = None
+            self,
+            data: pd.DataFrame,
+            target_column: str = None
     ) -> Union[Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]:
         """
         Prepare raw data for training or predict.
@@ -111,26 +159,13 @@ class DelayModel:
         # Getting minutes difference of scheduled time and operation time of the flight
         data['min_diff'] = data.apply(self.get_min_diff, axis=1)
 
-        # Setting delay label if delay > 15 minutes
-        data[target_column if target_column else 'delay'] = self.is_delay(data)
-
-        # Getting features and target
-        features, target = self.get_train_features(data)
-
-        # Splitting train test data
-        x_train, x_test, y_train, y_test = train_test_split(features, target, test_size=0.33, random_state=42)
-
-        # If there's target column, we can get the feature importance's.
+        # If target column is set, setting delay label if delay > 15 minutes
         if target_column:
-            X = data.drop([target_column])
-            y = data[target_column]
+            data[target_column] = self.is_delay(data)
+            data[target_column].value_counts()
 
-            xgb = XGBClassifier(random_state=1, learning_rate=0.01)
-            xgb.fit(X, y)
-
-        XGBClassifier
-
-        return
+        # Getting features and target dataframes
+        return self.get_train_features(data, target_column)
 
     def fit(
             self,
@@ -144,7 +179,20 @@ class DelayModel:
             features (pd.DataFrame): preprocessed data.
             target (pd.DataFrame): target.
         """
-        return
+        # Splitting data for train and test
+        x_train, x_test, y_train, y_test = train_test_split(
+            features, target, test_size=0.33, random_state=42
+        )
+
+        # Getting 1s and 0s count for balance training
+        n_y0 = (y_train == 0).sum()
+        n_y1 = (y_train == 1).sum()
+
+        # Training Logistic Regression with top 10' features and balance weights
+        self._model = LogisticRegression(class_weight={1: n_y0 / len(y_train), 0: n_y1 / len(y_train)})
+        self._model.fit(x_train, y_train)
+
+        self.store_model(x_test, y_test)
 
     def predict(
             self,
@@ -159,4 +207,5 @@ class DelayModel:
         Returns:
             (List[int]): predicted targets.
         """
+        
         return
