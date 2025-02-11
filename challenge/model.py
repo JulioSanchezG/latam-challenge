@@ -18,12 +18,38 @@ from sklearn.model_selection import train_test_split
 CURRENT_DIR = Path(__file__).parent.resolve()
 
 
+class ModelNotFound(Exception):
+    def __init__(self, message="Model was not found."):
+        self.message = message
+        super().__init__(self.message)
+
+
+class FeaturesNotFound(Exception):
+    def __init__(self, message="Features not found.", features: list = []):
+        self.message = message
+        super().__init__(self.message)
+
+        self.features = features
+
+
 class DelayModel:
 
     def __init__(self):
-        self._model: LogisticRegression | None = None  # Model should be saved in this attribute.
         self._model_version: str = '1.0'
-        self._model_path: Path = CURRENT_DIR.parent / "models" / f"v{self._model_version}"
+        self._dir_model_path: Path = CURRENT_DIR.parent / "models" / f"v{self._model_version}"
+        self._model_path: Path = self._dir_model_path / "lr_model.pkl"
+        self._model: LogisticRegression | None = (
+            joblib.load(self._model_path)
+            if os.path.exists(self._model_path)
+            else None
+        )  # Model should be saved in this attribute.
+
+        self._all_model_features: list | None = (
+            joblib.load(self._dir_model_path / "all_columns.pkl")
+            if os.path.exists(self._model_path)
+            else None
+        )
+
         self.top_10_features = [
             "OPERA_Latin American Wings",
             "MES_7",
@@ -90,11 +116,33 @@ class DelayModel:
     def is_delay(data: pd.DataFrame, threshold_in_minutes: int = 15) -> ndarray:
         return np.where(data['min_diff'] > threshold_in_minutes, 1, 0)
 
-    def get_train_features(self, data: pd.DataFrame, target_column: str = None) -> Union[
-        Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]:
-        # Never used, but in notebook.
-        # training_data = shuffle(data[['OPERA', 'MES', 'TIPOVUELO', 'SIGLADES', 'DIANOM', 'delay']], random_state=111)
+    def store_columns(self, columns: list):
+        with open(self._dir_model_path / "all_columns.pkl", "wb") as f:
+            joblib.dump(columns, f)
 
+    def read_features(self):
+        try:
+            return joblib.load(self._dir_model_path / "all_columns.pkl")
+        except FileNotFoundError:
+            print("Features file was not found.")
+
+    def validate_features(self, columns: list):
+        model_features = self.read_features()
+        not_found_features = set(columns) - set(model_features)
+
+        if not_found_features:
+            raise FeaturesNotFound(
+                f"Features were not found: {', '.join(not_found_features)}",
+                features=list(not_found_features),
+            )
+
+    def get_train_features(
+            self,
+            data: pd.DataFrame,
+            target_column: str = None
+    ) -> Union[Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]:
+
+        target = None
         features = pd.concat([
             pd.get_dummies(data['OPERA'], prefix='OPERA'),
             pd.get_dummies(data['TIPOVUELO'], prefix='TIPOVUELO'),
@@ -102,19 +150,25 @@ class DelayModel:
             axis=1
         )
 
-        # Getting just the top 10 features
-        features = features.reindex(columns=self.top_10_features, fill_value=0)
-
+        # If target column is set, store all data columns and create label
         if target_column:
+            self.store_columns(features.columns.tolist())
             target = data[[target_column]]
+
+            # Getting just the top 10 features
+            features = features.reindex(columns=self.top_10_features, fill_value=0)
+
             return features, target
 
-        return features
+        self.validate_features(features.columns.tolist())
+
+        # Getting just the top 10 features
+        return features.reindex(columns=self.top_10_features, fill_value=0)
 
     def store_model(self, x_test, y_test):
-        self._model_path.mkdir(parents=True, exist_ok=True)
+        self._dir_model_path.mkdir(parents=True, exist_ok=True)
 
-        joblib.dump(self._model, self._model_path / "lr_model.pkl")
+        joblib.dump(self._model, self._model_path)
 
         y_pred = self._model.predict(x_test)
         report = classification_report(y_test, y_pred, output_dict=True)
@@ -130,7 +184,7 @@ class DelayModel:
             },
         }
 
-        with open(self._model_path / "lr_metadata.json", "w") as f:
+        with open(self._dir_model_path / "lr_metadata.json", "w") as f:
             json.dump(metadata, f, indent=4)
 
     def preprocess(
@@ -150,17 +204,13 @@ class DelayModel:
             or
             pd.DataFrame: features.
         """
-        # Getting period of day
-        data['period_day'] = data['Fecha-I'].apply(self.get_period_day)
-
-        # Getting if Schedule Date is at high season
-        data['high_season'] = data['Fecha-I'].apply(self.is_high_season)
-
-        # Getting minutes difference of scheduled time and operation time of the flight
-        data['min_diff'] = data.apply(self.get_min_diff, axis=1)
 
         # If target column is set, setting delay label if delay > 15 minutes
         if target_column:
+            # Getting minutes difference of scheduled time and operation time of the flight
+            data['min_diff'] = data.apply(self.get_min_diff, axis=1)
+
+            # Set delay label
             data[target_column] = self.is_delay(data)
             data[target_column].value_counts()
 
@@ -207,19 +257,12 @@ class DelayModel:
         Returns:
             (List[int]): predicted targets.
         """
-        # Processing features
-        # processed_features = self.preprocess(features)
-
         # Getting just the top 10 features
         # NOTE: Just because in this case all the top 10 features are categorical,
         # it's not necessary to use a numeric imputer
         # top_10_processed_data = features.reindex(self.top_10_features, fill_value=0)
-
-        try:
-            self._model = joblib.load(f"{self._model_path}/lr_model.pkl")
-        except FileNotFoundError:
-            print("Model is not created yet.")
+        if not self._model:
+            raise ModelNotFound(message="Model was not loaded for prediction.")
 
         predicts = self._model.predict(features).tolist()
-
         return predicts
