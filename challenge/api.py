@@ -46,8 +46,19 @@ async def features_not_found(request: Request, fnf: FeaturesNotFound):
 
 
 @app.exception_handler(ModelNotFound)
-async def features_not_found(request: Request, mnf: ModelNotFound):
+async def model_not_found(request: Request, mnf: ModelNotFound):
     return JSONResponse(
         status_code=400,
         content={"message": mnf.message},
+    )
+
+
+@app.exception_handler(Exception)
+async def general_exception(request: Request, e: Exception):
+    return JSONResponse(
+        status_code=400,
+        content={
+            "message": "There was a general error on the API",
+            "details": str(e),
+        },
     )
