@@ -207,5 +207,19 @@ class DelayModel:
         Returns:
             (List[int]): predicted targets.
         """
-        
-        return
+        # Processing features
+        # processed_features = self.preprocess(features)
+
+        # Getting just the top 10 features
+        # NOTE: Just because in this case all the top 10 features are categorical,
+        # it's not necessary to use a numeric imputer
+        # top_10_processed_data = features.reindex(self.top_10_features, fill_value=0)
+
+        try:
+            self._model = joblib.load(f"{self._model_path}/lr_model.pkl")
+        except FileNotFoundError:
+            print("Model is not created yet.")
+
+        predicts = self._model.predict(features).tolist()
+
+        return predicts
