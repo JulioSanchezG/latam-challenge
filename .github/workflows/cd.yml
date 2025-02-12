@@ -23,9 +23,9 @@ jobs:
         uses: google-github-actions/auth@v0
         with:
           credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-          
+
       - name: Configure Docker for GCP
-        uses: google-github-actions/setup-gcloud@v0
+        uses: google-github-actions/setup-gcloud@v1
         with:
           project_id: model-api-challenge  # El ID de tu proyecto en GCP
           install_components: 'docker'
