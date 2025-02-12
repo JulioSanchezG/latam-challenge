@@ -1,7 +1,47 @@
 name: 'Continuous Delivery'
 
 on:
-  ...
+  push:
+    branches:
+      - main
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
 
 jobs:
-  ...
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Google Cloud Credentials
+        uses: google-github-actions/auth@v0
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+          
+      - name: Configure Docker for GCP
+        uses: google-github-actions/setup-gcloud@v0
+        with:
+          project_id: model-api-challenge  # El ID de tu proyecto en GCP
+          install_components: 'docker'
+
+      - name: Build Docker image
+        run: |
+          docker build -t gcr.io/model-api-challenge/model-api:v1 .
+
+      - name: Push Docker image to Artifact Registry
+        run: |
+          docker push gcr.io/model-api-challenge/model-api:v1
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy model-api \
+            --image gcr.io/model-api-challenge/model-api:v1 \
+            --platform managed \
+            --region us-central1 \   # O la región en la que tengas Cloud Run
+            --allow-unauthenticated
