@@ -23,4 +23,4 @@ USER api-user
 COPY models/ models/
 COPY challenge/ challenge/
 
-CMD ["uvicorn", "challenge.api:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "challenge.api:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "4"]
