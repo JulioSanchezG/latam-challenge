@@ -4,12 +4,7 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    types:
-      - opened
-      - reopened
-      - synchronize
-      - ready_for_review
+
 env:
   PROJECT_ID: model-api-challenge
   GAR_LOCATION: us-central1
