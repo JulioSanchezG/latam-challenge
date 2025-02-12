@@ -133,21 +133,41 @@ POST /predict
 
 - `prediction`: List of predicted class label.
 
-## CI/CD
+## CI/CD Pipeline
 
-CI/CD workflows ensure code testing, model process, api functionality and cloud deployment.
+My CI/CD pipeline automates testing, model validation, API functionality checks, and seamless cloud deployment.
+
+- **Continuous Integration (CI):**  
+  - Runs unit tests on the machine learning model to ensure performance and stability.  
+  - Executes API tests to verify correct functionality and responses.  
+
+- **Continuous Deployment (CD):**  
+  - Builds and packages the application using Docker.  
+  - Pushes the container image to **Google Artifact Registry**.  
+  - Deploys the application on **Google Cloud Run**, ensuring scalability and availability.  
+
+This automated workflow ensures that every code update is tested and deployed efficiently to maintain a reliable and production-ready system.
+
 
 ## Future Improvements
 
 Several enhancements can be considered for future iterations:
 
 1. **Model Storage Optimization**  
-   Instead of storing models in `.pkl` files within the repository, we could use Google Cloud Storage (GCS) buckets or Artifact Registry for version control and easy retrieval.
+   Instead of storing models in `.pkl` files within the repository, we could use **Google Cloud Storage (GCS) buckets** or **Artifact Registry** for version control and easy retrieval.
 
 2. **Pipeline-based Training and Inference**  
-   The current approach keeps preprocessing as a separate process. Instead, we could integrate sklearn pipelines to streamline feature processing, making inference more seamless.  
-   This would allow us to load the model as a single object and handle both preprocessing and predictions in one step.
+   The current approach keeps preprocessing as a separate process. Instead, we could integrate **sklearn pipelines** to streamline feature processing, making inference more seamless.  
+   This would allow us to **load the model as a single object** and handle both preprocessing and predictions in one step.  
 
-3**CI/CD Integration for Automated Deployment**  
-   Automate model versioning and deployment via GitHub Actions + GCP.
+3. **Improving CI with Best Practices**  
+   The CI pipeline can be enhanced by integrating **code quality and style enforcement tools**, such as:  
+   - **Linting** to ensure consistency and avoid common coding errors.  
+   - **Black** for automatic code formatting.  
+   - **SonarQube** for static code analysis and detecting vulnerabilities.  
+
+4. **Optimizing CD with Artifact Management**  
+   In the CD process, we could **store and manage the resulting sklearn pipeline artifact** instead of uploading all model-related files.  
+   - This approach would allow us to **deploy only the API**, keeping the pipeline in **Google Artifact Registry** or **GCS**.  
+   - The API would then retrieve and load the artifact dynamically, reducing complexity and ensuring version control.  
 
