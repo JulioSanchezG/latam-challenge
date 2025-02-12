@@ -1,0 +1,31 @@
+{
+    "date": "2025-02-10 23:14:53",
+    "version": "1.0",
+    "features": [
+        "OPERA_Latin American Wings",
+        "MES_7",
+        "MES_10",
+        "OPERA_Grupo LATAM",
+        "MES_12",
+        "TIPOVUELO_I",
+        "MES_4",
+        "MES_11",
+        "OPERA_Sky Airline",
+        "OPERA_Copa Air"
+    ],
+    "accuracy": {
+        "class_0": {
+            "precision": 0.8783445977224331,
+            "recall": 0.518585328523013,
+            "f1-score": 0.6521395428767829,
+            "support": 18294.0
+        },
+        "class_1": {
+            "precision": 0.24771504228239516,
+            "recall": 0.6881822496440436,
+            "f1-score": 0.3642987249544627,
+            "support": 4214.0
+        },
+        "accuracy": 0.550337657721699
+    }
+}
