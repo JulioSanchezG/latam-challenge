@@ -11,6 +11,7 @@ model = DelayModel()
 
 
 class Flights(BaseModel):
+    """Flights data class for data POST"""
     flights: List[Dict]
 
 
