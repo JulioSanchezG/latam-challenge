@@ -1,3 +1,5 @@
+"""Delay model module"""
+
 import json
 import os
 
@@ -19,13 +21,24 @@ CURRENT_DIR = Path(__file__).parent.resolve()
 
 
 class ModelNotFound(Exception):
+    """Class for model not found custom exception."""
     def __init__(self, message="Model was not found."):
+        """
+        Args:
+            message: Costume exception message.
+        """
         self.message = message
         super().__init__(self.message)
 
 
 class FeaturesNotFound(Exception):
+    """Class for features not found custom exception."""
     def __init__(self, message="Features not found.", features: list = []):
+        """
+        Args:
+            message: Costume exception message.
+            features: Feature list that were not found.
+        """
         self.message = message
         super().__init__(self.message)
 
@@ -33,6 +46,7 @@ class FeaturesNotFound(Exception):
 
 
 class DelayModel:
+    """Delay model preprocess, fit and predict functions"""
 
     def __init__(self):
         self._model_version: str = '1.0'
@@ -64,49 +78,15 @@ class DelayModel:
         ]
 
     @staticmethod
-    def get_period_day(date: str) -> str:
-        date_time = datetime.strptime(date, '%Y-%m-%d %H:%M:%S').time()
-        morning_min = datetime.strptime("05:00", '%H:%M').time()
-        morning_max = datetime.strptime("11:59", '%H:%M').time()
-        afternoon_min = datetime.strptime("12:00", '%H:%M').time()
-        afternoon_max = datetime.strptime("18:59", '%H:%M').time()
-        evening_min = datetime.strptime("19:00", '%H:%M').time()
-        evening_max = datetime.strptime("23:59", '%H:%M').time()
-        night_min = datetime.strptime("00:00", '%H:%M').time()
-        night_max = datetime.strptime("4:59", '%H:%M').time()
-
-        if morning_min < date_time < morning_max:
-            return 'mañana'
-        elif afternoon_min < date_time < afternoon_max:
-            return 'tarde'
-        elif (evening_min < date_time < evening_max) or (night_min < date_time < night_max):
-            return 'noche'
-
-    @staticmethod
-    def is_high_season(fecha: str) -> int:
-        fecha_año = int(fecha.split('-')[0])
-        fecha = datetime.strptime(fecha, '%Y-%m-%d %H:%M:%S')
-        range1_min = datetime.strptime('15-Dec', '%d-%b').replace(year=fecha_año)
-        range1_max = datetime.strptime('31-Dec', '%d-%b').replace(year=fecha_año)
-        range2_min = datetime.strptime('1-Jan', '%d-%b').replace(year=fecha_año)
-        range2_max = datetime.strptime('3-Mar', '%d-%b').replace(year=fecha_año)
-        range3_min = datetime.strptime('15-Jul', '%d-%b').replace(year=fecha_año)
-        range3_max = datetime.strptime('31-Jul', '%d-%b').replace(year=fecha_año)
-        range4_min = datetime.strptime('11-Sep', '%d-%b').replace(year=fecha_año)
-        range4_max = datetime.strptime('30-Sep', '%d-%b').replace(year=fecha_año)
-
-        if (
-                (range1_min <= fecha <= range1_max) or
-                (range2_min <= fecha <= range2_max) or
-                (range3_min <= fecha <= range3_max) or
-                (range4_min <= fecha <= range4_max)
-        ):
-            return 1
-        else:
-            return 0
-
-    @staticmethod
     def get_min_diff(data: pd.DataFrame) -> float:
+        """
+        Gets the minutes difference between flight operation and flight scheduled time.
+        Args:
+            data: Whole data dataframe.
+
+        Returns:
+            Minutes difference.
+        """
         fecha_o = datetime.strptime(data['Fecha-O'], '%Y-%m-%d %H:%M:%S')
         fecha_i = datetime.strptime(data['Fecha-I'], '%Y-%m-%d %H:%M:%S')
         min_diff = ((fecha_o - fecha_i).total_seconds()) / 60
@@ -114,19 +94,43 @@ class DelayModel:
 
     @staticmethod
     def is_delay(data: pd.DataFrame, threshold_in_minutes: int = 15) -> ndarray:
+        """
+        Sets the label to data if the minutes difference of the flight is higher than 15 minutes.
+        Args:
+            data: Whole data dataframe.
+            threshold_in_minutes: Minutes threshold to set delay label.
+
+        Returns:
+            Delay label array for all the records.
+        """
         return np.where(data['min_diff'] > threshold_in_minutes, 1, 0)
 
     def store_columns(self, columns: list):
+        """
+        Stores the columns in pickle file for validation.
+        Args:
+            columns: Input data columns list.
+        """
         with open(self._dir_model_path / "all_columns.pkl", "wb") as f:
             joblib.dump(columns, f)
 
-    def read_features(self):
+    def read_features(self) -> list:
+        """
+        Reads columns from a pickle file.
+        Returns:
+            Columns for validation.
+        """
         try:
             return joblib.load(self._dir_model_path / "all_columns.pkl")
         except FileNotFoundError:
             print("Features file was not found.")
 
     def validate_features(self, columns: list):
+        """
+        Validates if all input columns are inside the validation columns.
+        Args:
+            columns: Input columns list.
+        """
         model_features = self.read_features()
         not_found_features = set(columns) - set(model_features)
 
@@ -141,8 +145,18 @@ class DelayModel:
             data: pd.DataFrame,
             target_column: str = None
     ) -> Union[Tuple[pd.DataFrame, pd.DataFrame], pd.DataFrame]:
+        """
+        Gets the train features as dummy data.
+        if target columns is set, is training process and function will store the columns as pickle
+        and returns the targe as well.
+        If targe column
+        Args:
+            data: Whole input dataframe.
+            target_column: Target columns name.
 
-        target = None
+        Returns:
+            Features and target if it's for training.
+        """
         features = pd.concat([
             pd.get_dummies(data['OPERA'], prefix='OPERA'),
             pd.get_dummies(data['TIPOVUELO'], prefix='TIPOVUELO'),
@@ -156,6 +170,8 @@ class DelayModel:
             target = data[[target_column]]
 
             # Getting just the top 10 features
+            # NOTE: Just because in this case all the top 10 features are categorical,
+            # it's not necessary to use a numeric imputer.
             features = features.reindex(columns=self.top_10_features, fill_value=0)
 
             return features, target
@@ -166,6 +182,12 @@ class DelayModel:
         return features.reindex(columns=self.top_10_features, fill_value=0)
 
     def store_model(self, x_test, y_test):
+        """
+        Stores the model and his metadata.
+        Args:
+            x_test: Test data to predict.
+            y_test: Test data to validate predict.
+        """
         self._dir_model_path.mkdir(parents=True, exist_ok=True)
 
         joblib.dump(self._model, self._model_path)
@@ -257,10 +279,6 @@ class DelayModel:
         Returns:
             (List[int]): predicted targets.
         """
-        # Getting just the top 10 features
-        # NOTE: Just because in this case all the top 10 features are categorical,
-        # it's not necessary to use a numeric imputer
-        # top_10_processed_data = features.reindex(self.top_10_features, fill_value=0)
         if not self._model:
             raise ModelNotFound(message="Model was not loaded for prediction.")
 
