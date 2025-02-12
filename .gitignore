@@ -52,6 +52,7 @@ Thumbs.db
 ###########################
 reports
 coverage
+.coverage
 *.lcov
 .pytest_cache/
 
