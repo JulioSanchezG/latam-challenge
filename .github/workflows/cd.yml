@@ -32,7 +32,7 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t $GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$SERVICE:$VERSION .
+          docker build --build-arg MODEL_VERSION=${VERSION}.0 -t $GAR_LOCATION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$SERVICE:$VERSION .
 
       - name: Push Docker image to Artifact Registry
         run: |
